@@ -19,9 +19,7 @@ public class Main {
 	public static void main(String[] args) {
 		BufferedReader reader=null;
 		try {
-			//testGreedyBehavior();
-			
-			
+					
 			reader = new BufferedReader(new FileReader("test"));
 			StringBuffer text = new StringBuffer();
 			String line;
@@ -32,15 +30,15 @@ public class Main {
 			ArrayList<String> apiTemplate = extractPattern(text.toString(), "(.*)api:template\\s*\\\"([^\\\"]*)\\\"(.*)", 2);
 			ArrayList<String> wherePattern = extractPattern(text.toString(), "(.*)api:where\\s*\\\"([^\\\"]*)\\\"(.*)", 2);
 			if (apiTemplate.size()!=1 || wherePattern.size()!=1){
-				System.err.println("More than one api:template or where pattern");
+				System.err.println("More than one api:template or api:where pattern");
 				reader.close();
 				return;
 			}	
 			
-			Collection<String> optionals = extractOptionals(wherePattern.get(0), "?mw_freebase");
-			if (!optionals.isEmpty()){
+			HashMap<Integer, String> optionals = extractOptionals(wherePattern.get(0), "?mw_freebase");
+			if (!optionals.isEmpty()&&!optionals.containsKey(-1)){
 				System.out.println("Optionals names: ");
-				for (String optional : optionals) {
+				for (String optional : optionals.values()) {
 					System.out.println(optional);
 				}
 				System.out.println();
@@ -65,41 +63,11 @@ public class Main {
 		}
 
 	}
-	
-	private static void testGreedyBehavior(){
-		String pattern = "(.*?)bla";
 		
-		String text = "fafsdabla a fdfdbla";
-		ArrayList<String> matches = extractPattern(text, pattern, 1);
-		
-		if (!matches.isEmpty()){
-			System.out.println("Optionals names: ");
-			for (String match : matches) {
-				System.out.println(match);
-			}
-			System.out.println();
-		}
-		
-	}
-
-	private static ArrayList<String> extractOptionalUsingRegex(String wherePattern, String var) {
-		String keyword = "(UNION|GRAPH\\s*<[^<]*>)";
-		String sparqlBlock = "(\\s*"+keyword+"?\\s*\\{[^\\}]*\\})";
-		String interestBlock = "(\\s*"+keyword+"?\\s*\\{" +
-				"[^\\}]*"+var+"[^\\}]*" +
-				"\\})";
-		String optionalBlock = "(.*)(\\s*OPTIONAL" +
-				sparqlBlock+"*"+interestBlock+sparqlBlock+"*"+
-				")(.*?)";
-		
-		ArrayList<String> optional = extractPattern(wherePattern, optionalBlock, 2);
-		return optional;
-	}
-	
-	private static Collection<String> extractOptionals(String text, String var) {
+	private static HashMap<Integer, String> extractOptionals(String text, String var) {
 		HashMap<Integer, String> optionalClauses = new HashMap<Integer, String>();		
 		//look for all appearances of var
-		//for each appearance look for the nearest GRAPH keyword before its appearance
+		//for each appearance look for the nearest OPTIONAL keyword and check that the OPTIONAL block contains the var
 		
 		int varIndex = 0;
 		int lastIndexOfOptional = 0;
@@ -117,12 +85,18 @@ public class Main {
 				if (varIndex<lastClosingBracket){
 					optionalClauses.put(lastIndexOfOptional, text.substring(lastIndexOfOptional, lastClosingBracket));
 				}
+				else{
+					optionalClauses.put(-1, var);//shows there are triple patterns which are not OPTIONAL
+				}
+			}
+			else{
+				optionalClauses.put(-1, var);
 			}
 							
 			fromIndex = varIndex+var.length()+1;
 		}
 		
-		return optionalClauses.values();
+		return optionalClauses;
 	}
 	
 	private static String extractDefaultGraph(String text, String var) {
@@ -131,24 +105,6 @@ public class Main {
 		String pattern = extractPatternOnce(text, defaultGraph, 1);
 		
 		return pattern;
-	}
-
-	private static ArrayList<String> extractSurroundingGraphNameUsingRegex(String text, String var) {
-		String inGraphKeyword = "(UNION|OPTIONAL)";
-		String SHORT_NOTATION = "([^;\r\n]*;)*[^\\.\r\n]*\\.";
-		String FULL_TRIPLE = "([^\\.\n\r]+\\.";
-		String subjectBlock = "("+SHORT_NOTATION+" | "+FULL_TRIPLE+")";
-		String sparqlBlock = "(\\s*"+inGraphKeyword+"?\\s*\\{[^\\}]*\\})|"+subjectBlock;
-		
-		//String SHORT_NOTATION_INTEREST = "([^;\r\n]*;)*[^\\.\r\n]*\\.";
-		//String FULL_TRIPLE = "([^\\.\n\r]+\\.";
-		//String subjectBlock = "("+SHORT_NOTATION+" | "+FULL_TRIPLE+")";
-		String interestBlock = "(\\s*"+inGraphKeyword+"?\\s*\\{[^\\}]*"+var+"[^\\}]*\\})";
-		ArrayList<String> graphNames = extractPattern(text, "GRAPH\\s*([^\\{]*)\\s*((\\{"+
-							sparqlBlock+"*"+interestBlock+sparqlBlock+
-							"*\\})|"+
-							interestBlock+")", 1);
-		return graphNames;
 	}
 	
 	private static HashMap<String, String> extractGraphNamesAndOuterBlocks(String text, String var) {
@@ -231,7 +187,6 @@ public class Main {
 		
 		return charIndex;
 	}
-	
 
 	private static ArrayList<String> extractPattern(String text, String pattern, int groupNumber) {
 		Pattern p1 = Pattern.compile(pattern);
@@ -256,4 +211,51 @@ public class Main {
 		return null;
 	}
 
+	private static ArrayList<String> extractSurroundingGraphNameUsingRegex(String text, String var) {
+		String inGraphKeyword = "(UNION|OPTIONAL)";
+		String SHORT_NOTATION = "([^;\r\n]*;)*[^\\.\r\n]*\\.";
+		String FULL_TRIPLE = "([^\\.\n\r]+\\.";
+		String subjectBlock = "("+SHORT_NOTATION+" | "+FULL_TRIPLE+")";
+		String sparqlBlock = "(\\s*"+inGraphKeyword+"?\\s*\\{[^\\}]*\\})|"+subjectBlock;
+		
+		//String SHORT_NOTATION_INTEREST = "([^;\r\n]*;)*[^\\.\r\n]*\\.";
+		//String FULL_TRIPLE = "([^\\.\n\r]+\\.";
+		//String subjectBlock = "("+SHORT_NOTATION+" | "+FULL_TRIPLE+")";
+		String interestBlock = "(\\s*"+inGraphKeyword+"?\\s*\\{[^\\}]*"+var+"[^\\}]*\\})";
+		ArrayList<String> graphNames = extractPattern(text, "GRAPH\\s*([^\\{]*)\\s*((\\{"+
+							sparqlBlock+"*"+interestBlock+sparqlBlock+
+							"*\\})|"+
+							interestBlock+")", 1);
+		return graphNames;
+	}
+
+	private static void testGreedyBehavior(){
+		String pattern = "(.*?)bla";
+		
+		String text = "fafsdabla a fdfdbla";
+		ArrayList<String> matches = extractPattern(text, pattern, 1);
+		
+		if (!matches.isEmpty()){
+			System.out.println("Optionals names: ");
+			for (String match : matches) {
+				System.out.println(match);
+			}
+			System.out.println();
+		}
+		
+	}
+
+	private static ArrayList<String> extractOptionalUsingRegex(String wherePattern, String var) {
+		String keyword = "(UNION|GRAPH\\s*<[^<]*>)";
+		String sparqlBlock = "(\\s*"+keyword+"?\\s*\\{[^\\}]*\\})";
+		String interestBlock = "(\\s*"+keyword+"?\\s*\\{" +
+				"[^\\}]*"+var+"[^\\}]*" +
+				"\\})";
+		String optionalBlock = "(.*)(\\s*OPTIONAL" +
+				sparqlBlock+"*"+interestBlock+sparqlBlock+"*"+
+				")(.*?)";
+		
+		ArrayList<String> optional = extractPattern(wherePattern, optionalBlock, 2);
+		return optional;
+	}
 }
