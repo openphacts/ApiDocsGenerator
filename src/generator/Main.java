@@ -13,10 +13,18 @@ import java.util.regex.Pattern;
 
 public class Main {
 
+	public static void main(String[] args) {
+		String currentLine = "bla bla2 adf ;\n";
+		String[] tokens = currentLine.split("[\\s;.]");
+		System.out.println("Length: "+tokens.length);
+		for (int i = 0; i < tokens.length; i++) {
+			System.out.println(tokens[i]);
+		}
+	}
 	/**
 	 * @param args
 	 */
-	public static void main(String[] args) {
+	public static void main2(String[] args) {
 		BufferedReader reader=null;
 		try {
 					
@@ -35,7 +43,7 @@ public class Main {
 				return;
 			}	
 			
-			HashMap<Integer, String> optionals = extractOptionals(wherePattern.get(0), "?mw_freebase");
+			/*HashMap<Integer, String> optionals = extractOptionals(wherePattern.get(0), "?mw_freebase");
 			if (!optionals.isEmpty()&&!optionals.containsKey(-1)){
 				System.out.println("Optionals names: ");
 				for (String optional : optionals.values()) {
@@ -51,7 +59,7 @@ public class Main {
 					System.out.println("Graph: "+entry.getKey()+" ; OuterBlock: "+entry.getValue());
 				}
 				System.out.println();				
-			}		
+			}	*/	
 			
 			reader.close();
 		} catch (FileNotFoundException e) {
@@ -62,130 +70,6 @@ public class Main {
 			e.printStackTrace();
 		}
 
-	}
-		
-	private static HashMap<Integer, String> extractOptionals(String text, String var) {
-		HashMap<Integer, String> optionalClauses = new HashMap<Integer, String>();		
-		//look for all appearances of var
-		//for each appearance look for the nearest OPTIONAL keyword and check that the OPTIONAL block contains the var
-		
-		int varIndex = 0;
-		int lastIndexOfOptional = 0;
-		int fromIndex = 0;
-		
-		while (true){
-			varIndex = text.indexOf(var, fromIndex);
-			if (varIndex==-1){
-				break;
-			}
-			
-			lastIndexOfOptional = text.lastIndexOf("OPTIONAL", varIndex);
-			if (lastIndexOfOptional!=-1){
-				int lastClosingBracket = findClosingBracket(text, text.indexOf('{', lastIndexOfOptional));
-				if (varIndex<lastClosingBracket){
-					optionalClauses.put(lastIndexOfOptional, text.substring(lastIndexOfOptional, lastClosingBracket));
-				}
-				else{
-					optionalClauses.put(-1, var);//shows there are triple patterns which are not OPTIONAL
-				}
-			}
-			else{
-				optionalClauses.put(-1, var);
-			}
-							
-			fromIndex = varIndex+var.length()+1;
-		}
-		
-		return optionalClauses;
-	}
-	
-	private static String extractDefaultGraph(String text, String var) {
-		String keyword = "(UNION|OPTIONAL|GRAPH)";
-		String defaultGraph = "(.*?)"+keyword;
-		String pattern = extractPatternOnce(text, defaultGraph, 1);
-		
-		return pattern;
-	}
-	
-	private static HashMap<String, String> extractGraphNamesAndOuterBlocks(String text, String var) {
-		HashMap<String, String> relevantSPARQLBlocks = new HashMap<String, String>();// map between the graph names and the relevant block within that graph in which the variable appears		
-		//look for all appearances of var
-		//for each appearance look for the nearest GRAPH keyword before its appearance
-		
-		int varIndex = 0;
-		int lastIndexOfGraph = 0;
-		int fromIndex = 0;
-		
-		while (true){
-			varIndex = text.indexOf(var, fromIndex);
-			if (varIndex==-1){
-				break;
-			}
-			
-			lastIndexOfGraph = text.lastIndexOf("GRAPH", varIndex);
-			if (lastIndexOfGraph!=-1){
-				int lastClosingBracket = findClosingBracket(text, text.indexOf('{', lastIndexOfGraph)+1);
-				if (varIndex>lastClosingBracket){
-					throw new RuntimeException("Assumption violated: required triple patterns should appear before OPTIONAL, UNION, GRAPH clauses");
-				}
-				else{
-					int graphNameStart = text.indexOf('<', lastIndexOfGraph)+1;
-					int graphNameEnd = text.indexOf('>', lastIndexOfGraph);
-					String graphName = text.substring(graphNameStart, graphNameEnd);			
-					
-					//ASSUMPTION: if a variable appears multiple times in a block, show only the first extracted outer block
-					if (!relevantSPARQLBlocks.containsKey(graphName)){
-						String outerBlock = extractOuterBlock(text, varIndex);
-						relevantSPARQLBlocks.put(graphName, outerBlock);
-					}
-				}
-			}
-			else{
-				if (!relevantSPARQLBlocks.containsKey("DEFAULT")){
-					relevantSPARQLBlocks.put("DEFAULT", extractDefaultGraph(text, var));
-				}
-			}
-				
-			fromIndex = varIndex+var.length()+1;
-		}
-		
-		return relevantSPARQLBlocks;
-	}
-	
-	private static String extractOuterBlock(String text, int varIndex){
-		int openBracket = text.lastIndexOf("{", varIndex);
-		int bracketIndex=1;
-		int charIndex=openBracket+1;
-		while (bracketIndex!=0){
-			if (text.charAt(charIndex)=='{'){
-				bracketIndex++;
-			}
-			else if (text.charAt(charIndex)=='}'){
-				bracketIndex--;
-			}
-			
-			charIndex++;
-		}
-		
-		return text.substring(openBracket, charIndex);
-	}
-	
-	private static int findClosingBracket(String text, int fromIndex){
-		int bracketNo = 1;
-		int charIndex=fromIndex+1;
-		
-		while (bracketNo!=0){
-			if (text.charAt(charIndex)=='{'){
-				bracketNo++;
-			}
-			else if (text.charAt(charIndex)=='}'){
-				bracketNo--;
-			}
-			
-			charIndex++;
-		}
-		
-		return charIndex;
 	}
 
 	private static ArrayList<String> extractPattern(String text, String pattern, int groupNumber) {
@@ -200,16 +84,7 @@ public class Main {
 		return ret;
 	}
 	
-	private static String extractPatternOnce(String text, String pattern, int groupNumber) {
-		Pattern p1 = Pattern.compile(pattern);
-		Matcher matcher = p1.matcher(text);			
-		
-		if (matcher.find()){
-			return matcher.group(groupNumber);
-		}
-		
-		return null;
-	}
+	
 
 	private static ArrayList<String> extractSurroundingGraphNameUsingRegex(String text, String var) {
 		String inGraphKeyword = "(UNION|OPTIONAL)";
