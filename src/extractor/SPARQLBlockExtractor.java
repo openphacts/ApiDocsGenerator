@@ -1,9 +1,12 @@
-package generator;
+package extractor;
 
 import java.util.HashMap;
 
+
 public class SPARQLBlockExtractor extends TextExtractor {
 
+	public static final String [] SPARQL_KEYWORDS ={"GRAPH", "SELECT", "GROUP BY", "ORDER BY"};
+	
 	public SPARQLBlockExtractor(String whereClause) {
 		super(whereClause);
 	}
@@ -18,7 +21,7 @@ public class SPARQLBlockExtractor extends TextExtractor {
 		int fromIndex = 0;
 		
 		while (true){
-			varIndex = text.indexOf(var, fromIndex);
+			varIndex = text.indexOf(var, fromIndex);			
 			if (varIndex==-1){
 				break;
 			}
@@ -55,14 +58,20 @@ public class SPARQLBlockExtractor extends TextExtractor {
 		int fromIndex = 0;
 		
 		while (true){
-			varIndex = text.indexOf(var, fromIndex);
+			varIndex = text.indexOf(var, fromIndex);	
 			if (varIndex==-1){
 				break;
 			}
 			
+			if (currentLineContainsKeyword(text, varIndex)){
+				fromIndex = varIndex+var.length()+1;
+				continue;
+			}		
+			
 			lastIndexOfGraph = text.lastIndexOf("GRAPH", varIndex);
 			if (lastIndexOfGraph!=-1){
-				int lastClosingBracket = findClosingBracket(text.indexOf('{', lastIndexOfGraph)+1);
+				int indexOfEndingGraphName = text.indexOf('>', lastIndexOfGraph);
+				int lastClosingBracket = findClosingBracket(text.indexOf('{', indexOfEndingGraphName)+1);
 				if (varIndex>lastClosingBracket){
 					throw new RuntimeException("Assumption violated: required triple patterns should appear before OPTIONAL, UNION, GRAPH clauses");
 				}
@@ -90,6 +99,18 @@ public class SPARQLBlockExtractor extends TextExtractor {
 		return relevantSPARQLBlocks;
 	}
 	
+	private boolean currentLineContainsKeyword(String text, int varIndex) {
+		int lastEOL = text.lastIndexOf('\n', varIndex);
+		int nextEOL = text.indexOf('\n', varIndex);
+		String currentLine = text.substring(lastEOL+1, nextEOL);
+		
+		for (int i = 0; i < SPARQL_KEYWORDS.length; i++) {
+			if (currentLine.indexOf(SPARQL_KEYWORDS[i])!=-1)
+				return true;
+		}
+		return false;
+	}
+
 	private String extractOuterBlock(int varIndex){
 		int openBracket = text.lastIndexOf("{", varIndex);
 		int bracketIndex=1;
@@ -129,7 +150,7 @@ public class SPARQLBlockExtractor extends TextExtractor {
 	private String extractDefaultGraph(String text, String var) {
 		String keyword = "(UNION|OPTIONAL|GRAPH)";
 		String defaultGraph = "(.*?)"+keyword;
-		String pattern = extractPatternOnce(text, defaultGraph, 1);
+		String pattern = extractFirstPattern(text, defaultGraph, 1);
 		
 		return pattern;
 	}

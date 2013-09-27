@@ -11,6 +11,8 @@ public class ColorCoding {
 	public static final short OPTIONAL_SINGLETON = 2;
 	public static final short OPTIONAL_LIST = 3;
 	
+	public static final String[] OPTION_NAMES={"REQUIRED_SINGLETON", "REQUIRED_LIST", "OPTIONAL_SINGLETON", "OPTIONAL_LIST"};
+	
 	private String[] colorCodes = new String[4];
 
 	public ColorCoding(File colorCodingFile) {
@@ -39,6 +41,15 @@ public class ColorCoding {
 			return false;
 		}
 		return true;
+	}
+	
+	public String getAvailableOptions(){
+		String ret="";
+		for (int i = 0; i < OPTION_NAMES.length; i++) {
+			ret+=i+"-"+OPTION_NAMES[i]+" ; ";
+		}
+		
+		return ret;
 	}
 	
 	
