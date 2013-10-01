@@ -17,7 +17,7 @@ public class MainFlowHandler {
 	
 	private static final String DOC_FILE_EXTENSION = ".doc";
 	private static final String API_CONFIG_DIR = "/var/www/html/api-config-files";
-	//private static final String API_CONFIG_DIR = "/home/sever/git/DocsGenerator/api-config-files";
+	//private static final String API_CONFIG_DIR = "/home/sever/devel/DocsGenerator/api-config-files";
 	private static final String COLOR_CODES_FILE = API_CONFIG_DIR+"/colorCoding/ColorCodes";
 	private static final String DOCS_FOLDER_PATH = API_CONFIG_DIR+"/docs";
 	
@@ -43,36 +43,41 @@ public class MainFlowHandler {
 		ColorCoding colorCoding = new ColorCoding(new File(COLOR_CODES_FILE));
 		scanner = new Scanner(System.in);
 		
+		System.out.println("Starting iteration on config files..");
 		for (final File fileEntry : interestFiles) {
-	        String configFileName = fileEntry.getName();
-	        
-			if (configFileName.endsWith(".ttl")) {
-				System.out.println("Applying markup to the file: "+configFileName+"\n");
-				
-	            BufferedReader reader = new BufferedReader(new FileReader(fileEntry));
-	            String text = readEntireFile(reader);
-	            
-	            ConfigExtractor configExtractor = new ConfigExtractor(text);
-	            String apiTemplate = configExtractor.getApiTemplate();
-	            String whereClause = configExtractor.getWhereClause();   
-	            if (apiTemplate==null || whereClause==null){
-	            	System.out.println("Skipping "+configFileName+" ; no api template or where clause ===========");
-	            	reader.close();
-	            	continue;
-	            }
-	            
-	            apiTemplate = apiTemplate.trim();
-	            whereClause = whereClause.trim();
-	            SPARQLBlockExtractor sparqlExtractor = new SPARQLBlockExtractor(whereClause);
-	            
-	            MarkupHandler markupHandler = new MarkupHandler(apiTemplate, colorCoding);
-	            applyMarkupOnApiTemplate(colorCoding, sparqlExtractor, markupHandler);
-	            
-	            writeMarkupedTemplateToFile(configFileName, markupHandler);
-	            
-	            reader.close();
-	        } 
+			String configFileName = fileEntry.getName();
+
+			System.out.println("Applying markup to the file: " + configFileName	+ "\n");
+
+			BufferedReader reader = new BufferedReader(new FileReader(fileEntry));
+			String text = readEntireFile(reader);
+
+			ConfigExtractor configExtractor = new ConfigExtractor(text);
+			String apiTemplate = configExtractor.getApiTemplate();
+			String whereClause = configExtractor.getWhereClause();
+			if (apiTemplate == null || whereClause == null) {
+				System.out.println("Skipping " + configFileName
+						+ " ; no api template or where clause ===========\n");
+				reader.close();
+				continue;
+			}
+
+			apiTemplate = apiTemplate.trim();
+			whereClause = whereClause.trim();
+			SPARQLBlockExtractor sparqlExtractor = new SPARQLBlockExtractor(
+					whereClause);
+
+			MarkupHandler markupHandler = new MarkupHandler(apiTemplate,
+					colorCoding);
+			applyMarkupOnApiTemplate(colorCoding, sparqlExtractor,
+					markupHandler);
+
+			writeMarkupedTemplateToFile(configFileName, markupHandler);
+
+			reader.close();
+
 	    }	
+		System.out.println("Iteration on config files finished");
 		
 		scanner.close();
 	}
@@ -86,7 +91,7 @@ public class MainFlowHandler {
 	}
 
 	private String readEntireFile(BufferedReader reader) throws IOException {
-		char[] cbuf = new char[20000];
+		char[] cbuf = new char[65536];
 		reader.read(cbuf);
 		String text = new String(cbuf);
 		return text;
@@ -154,21 +159,24 @@ public class MainFlowHandler {
 		LinkedList<File> remainingInterestFiles = new LinkedList<File>();
 		
 		for (File file : interestFiles) {
-			boolean include = true;
-			for (String fileName : existingDocFileNames){
-				String rootName = fileName.substring(0, fileName.lastIndexOf('.'));
-				String ttlFileName = API_CONFIG_DIR+"/"+rootName+".ttl";
-				if (file.getAbsolutePath().equals(ttlFileName)){
-					include = false;
-					break;
+			if (file.getName().endsWith(".ttl")) {
+				boolean include = true;
+				for (String fileName : existingDocFileNames) {
+					String rootName = fileName.substring(0, fileName.lastIndexOf('.'));
+					String ttlFileName = API_CONFIG_DIR + "/" + rootName+ ".ttl";
+					if (file.getAbsolutePath().equals(ttlFileName)) {
+						include = false;
+						break;
+					}
 				}
-			}
-			
-			if (include){
-				remainingInterestFiles.add(file);
+
+				if (include) {
+					remainingInterestFiles.add(file);
+				}
 			}
 		}
 		
+		interestFiles = new File[remainingInterestFiles.size()];
 		interestFiles = remainingInterestFiles.toArray(interestFiles);
 	}
 }

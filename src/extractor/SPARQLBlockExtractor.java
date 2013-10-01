@@ -16,7 +16,8 @@ public class SPARQLBlockExtractor extends TextExtractor {
 	
 	public String extractObjectFromTriple(String currentLine) {
 		String lastToken = extractLastGroupPattern(currentLine,  TRIPLE_PATTERN);
-		if (lastToken == null){
+		
+		if (lastToken==null){
 			throw new RuntimeException("Template triple not in expected format");
 		}	
 		
@@ -55,6 +56,17 @@ public class SPARQLBlockExtractor extends TextExtractor {
 		int bracketIndex = 0;
 		int maxBracketIndex = 0;
 		while (true){
+			if (charIndex==0){
+				String currentLine = getCurrentLine(text, charIndex);
+				if (addNewGraphBlockMapping(relevantSPARQLBlocks, varIndex, currentLine)==false){
+					if (!relevantSPARQLBlocks.containsKey("DEFAULT")){
+						String outerBlock = extractOuterBlock(varIndex);
+						relevantSPARQLBlocks.put("DEFAULT", outerBlock);
+					}
+				}					
+				break;
+			}
+			
 			if (text.charAt(charIndex)=='{'){
 				bracketIndex++;
 				if (bracketIndex > maxBracketIndex){
@@ -69,17 +81,7 @@ public class SPARQLBlockExtractor extends TextExtractor {
 				bracketIndex--;
 			}
 			
-			charIndex--;
-			if (charIndex==0){
-				String currentLine = getCurrentLine(text, charIndex);
-				if (addNewGraphBlockMapping(relevantSPARQLBlocks, varIndex, currentLine)==false){
-					if (!relevantSPARQLBlocks.containsKey("DEFAULT")){
-						String outerBlock = extractOuterBlock(varIndex);
-						relevantSPARQLBlocks.put("DEFAULT", outerBlock);
-					}
-				}					
-				break;
-			}
+			charIndex--;		
 		}
 	}
 
@@ -196,15 +198,19 @@ public class SPARQLBlockExtractor extends TextExtractor {
 	private String getCurrentLine(String text, int currentIndex) {
 		int lastEOL = text.lastIndexOf('\n', currentIndex);
 		int nextEOL = text.indexOf('\n', currentIndex);
-		 
-		return text.substring(lastEOL+1, nextEOL);
+		if (nextEOL!=-1){ 
+			return text.substring(lastEOL+1, nextEOL);
+		}
+		else{
+			return text.substring(lastEOL+1);
+		}
 	}
 
 	private String extractOuterBlock(int varIndex){
 		int openBracket = text.lastIndexOf("{", varIndex);
 		int bracketIndex=1;
 		int charIndex=openBracket+1;
-		while (bracketIndex!=0){
+		while (bracketIndex!=0 && charIndex<text.length()){
 			if (text.charAt(charIndex)=='{'){
 				bracketIndex++;
 			}
@@ -215,6 +221,7 @@ public class SPARQLBlockExtractor extends TextExtractor {
 			charIndex++;
 		}
 		
+		openBracket = openBracket==-1 ? 0 : openBracket;
 		return text.substring(openBracket, charIndex);
 	}
 
