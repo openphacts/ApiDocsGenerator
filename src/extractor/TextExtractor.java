@@ -42,4 +42,15 @@ public class TextExtractor {
 		return ret;
 	}
 	
+	protected String extractLastGroupPattern(String text, String pattern) {
+		Pattern p1 = Pattern.compile(pattern);
+		Matcher matcher = p1.matcher(text);			
+		
+		if (matcher.find()){
+			return matcher.group(matcher.groupCount()-4);
+		}
+		
+		return null;
+	}
+	
 }

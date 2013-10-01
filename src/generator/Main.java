@@ -6,7 +6,7 @@ import java.io.IOException;
 public class Main {
 
 	public static void main(String[] args) {
-		MainFlowHandler mainFlow = new MainFlowHandler();
+		MainFlowHandler mainFlow = new MainFlowHandler(true);
 		try {
 			mainFlow.runFlow();
 		} catch (IOException e) {

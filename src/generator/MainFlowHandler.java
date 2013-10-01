@@ -6,6 +6,8 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.NoSuchElementException;
 import java.util.Scanner;
 
 import extractor.ConfigExtractor;
@@ -14,16 +16,34 @@ import extractor.SPARQLBlockExtractor;
 public class MainFlowHandler {
 	
 	private static final String DOC_FILE_EXTENSION = ".doc";
-	//private static final String API_CONFIG_DIR = "/var/www/html/api-config-files";
-	private static final String API_CONFIG_DIR = "/home/sever/git/DocsGenerator/api-config-files";
+	private static final String API_CONFIG_DIR = "/var/www/html/api-config-files";
+	//private static final String API_CONFIG_DIR = "/home/sever/git/DocsGenerator/api-config-files";
 	private static final String COLOR_CODES_FILE = API_CONFIG_DIR+"/colorCoding/ColorCodes";
 	private static final String DOCS_FOLDER_PATH = API_CONFIG_DIR+"/docs";
+	
+	private File configFolder = new File(API_CONFIG_DIR);
+	private File[] interestFiles;
+	private Scanner scanner;
+
+	public MainFlowHandler() {
+		super();	
+		interestFiles = configFolder.listFiles();
+	}
+
+	public MainFlowHandler(boolean onlyRemaining) {
+		super();
+		interestFiles = configFolder.listFiles();
+		
+		if (onlyRemaining==true){	
+			removeExistingDocsFromInterestFiles();
+		}
+	}
 
 	public void runFlow() throws IOException{
 		ColorCoding colorCoding = new ColorCoding(new File(COLOR_CODES_FILE));
-		File configFolder = new File(API_CONFIG_DIR);
+		scanner = new Scanner(System.in);
 		
-		for (final File fileEntry : configFolder.listFiles()) {
+		for (final File fileEntry : interestFiles) {
 	        String configFileName = fileEntry.getName();
 	        
 			if (configFileName.endsWith(".ttl")) {
@@ -33,8 +53,16 @@ public class MainFlowHandler {
 	            String text = readEntireFile(reader);
 	            
 	            ConfigExtractor configExtractor = new ConfigExtractor(text);
-	            String apiTemplate = configExtractor.getApiTemplate().trim();
-	            String whereClause = configExtractor.getWhereClause().trim();
+	            String apiTemplate = configExtractor.getApiTemplate();
+	            String whereClause = configExtractor.getWhereClause();   
+	            if (apiTemplate==null || whereClause==null){
+	            	System.out.println("Skipping "+configFileName+" ; no api template or where clause ===========");
+	            	reader.close();
+	            	continue;
+	            }
+	            
+	            apiTemplate = apiTemplate.trim();
+	            whereClause = whereClause.trim();
 	            SPARQLBlockExtractor sparqlExtractor = new SPARQLBlockExtractor(whereClause);
 	            
 	            MarkupHandler markupHandler = new MarkupHandler(apiTemplate, colorCoding);
@@ -45,6 +73,8 @@ public class MainFlowHandler {
 	            reader.close();
 	        } 
 	    }	
+		
+		scanner.close();
 	}
 
 	private void writeMarkupedTemplateToFile(String configFileName, MarkupHandler markupHandler) throws IOException {
@@ -63,36 +93,48 @@ public class MainFlowHandler {
 	}
 
 	private void applyMarkupOnApiTemplate(ColorCoding colorCoding, SPARQLBlockExtractor sparqlExtractor, MarkupHandler markupHandler) throws IOException {
-		Scanner s = new Scanner(System.in);
+		
 		while (markupHandler.hasNext()){
 			String currentLine = markupHandler.next();
 			PrettyPrinter.printCurrentLine(currentLine);
 			
-			String objectValue = extractObjectFromTriple(currentLine);
+			String objectValue = sparqlExtractor.extractObjectFromTriple(currentLine);
 			
 			extractRelevantBlocksAndPrint(sparqlExtractor, objectValue);
 			
-			int userOption = promptUserForMarkupOption(colorCoding, s);
+			int userOption = promptUserForMarkupOption(colorCoding, scanner);
 			markupHandler.applyMarkup(userOption);
 			System.out.println("======================================================================");
-		}
-		s.close();
+		}		
 	}
 
 	private int promptUserForMarkupOption(ColorCoding colorCoding, Scanner s) {
 		System.out.println("Introduce markup OPTION: ");
 		System.out.println("Available OPTIONS: "+colorCoding.getAvailableOptions());
-		int userOption = s.nextInt();
-		if (!colorCoding.checkOptionValidity(userOption)){
-			System.err.println("Unknown option");
-			System.exit(-1);
+		int userOption=0;
+		while (true) {
+			try{		
+			String line = s.nextLine();
+			userOption = Integer.parseInt(line, 10);
+			if (!colorCoding.checkOptionValidity(userOption)) {
+				System.err.println("Unrecognized option, try again");
+				continue;
+			}
+			break;
+			}
+			catch(NumberFormatException e){
+				System.err.println("NumberFormatException: "+e.getMessage());
+			}
+			catch(NoSuchElementException e){
+				System.err.println("NoSuchElement: "+e.getMessage());
+			}
 		}
 		return userOption;
 	}
 
 	private void extractRelevantBlocksAndPrint(SPARQLBlockExtractor sparqlExtractor, String objectValue) {
 		HashMap<Integer, String> optionals = sparqlExtractor.extractOptionals(objectValue);
-		HashMap<String, String> graphBlockMap = sparqlExtractor.extractGraphNamesAndOuterBlocks(objectValue);;
+		HashMap<String, String> graphBlockMap = sparqlExtractor.extractGraphNamesAndOuterBlocksEfficiently(objectValue);;
 		
 		if (!graphBlockMap.isEmpty()){
 			PrettyPrinter.printGraphNames(graphBlockMap, objectValue);	
@@ -106,17 +148,27 @@ public class MainFlowHandler {
 		}
 	}
 
-	private String extractObjectFromTriple(String currentLine) {
-		String[] tokens = currentLine.split("\\s");
-		if (tokens.length>3){
-			throw new RuntimeException("Api:Template line with more than 3 tokens");
-		}
-		if (tokens.length<2){
-			throw new RuntimeException("Api:Template line with less than 1 token");
+	private void removeExistingDocsFromInterestFiles() {
+		File docsFolder = new File(DOCS_FOLDER_PATH);
+		String[] existingDocFileNames = docsFolder.list();
+		LinkedList<File> remainingInterestFiles = new LinkedList<File>();
+		
+		for (File file : interestFiles) {
+			boolean include = true;
+			for (String fileName : existingDocFileNames){
+				String rootName = fileName.substring(0, fileName.lastIndexOf('.'));
+				String ttlFileName = API_CONFIG_DIR+"/"+rootName+".ttl";
+				if (file.getAbsolutePath().equals(ttlFileName)){
+					include = false;
+					break;
+				}
+			}
+			
+			if (include){
+				remainingInterestFiles.add(file);
+			}
 		}
 		
-		//variable or graph name
-		return tokens[tokens.length-1];
+		interestFiles = remainingInterestFiles.toArray(interestFiles);
 	}
-	
 }

@@ -1,6 +1,10 @@
 package generator;
 
 import java.util.Iterator;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import extractor.SPARQLBlockExtractor;
 
 public class MarkupHandler implements Iterator<String> {
 
@@ -48,21 +52,22 @@ public class MarkupHandler implements Iterator<String> {
 	public void applyMarkup(int option){
 		String openSpan = OPEN_SPAN_TEMPLATE.replaceFirst("\\{colorCode\\}", colorCoding.getCode(option));
 		
-		String[] tokens = currentLine.split("\\s");
+		Pattern p1 = Pattern.compile(SPARQLBlockExtractor.TRIPLE_PATTERN);
+		Matcher matcher = p1.matcher(currentLine);		
 		
 		String markupedLine = "";
 		String predicate, object;
-		if (tokens.length == 3){
-			markupedLine+=tokens[0]+" ";
-			predicate = tokens[1];
-			object = tokens[2];
-		}
-		else if (tokens.length == 2){
-			markupedLine+="\t ";
-			predicate = tokens[0];
-			object = tokens[1];
-		}
-		else throw new RuntimeException("Unexpected number of tokens on a line");
+		if (matcher.find()){
+			if (matcher.group(1)!=null){
+				markupedLine+=matcher.group(1)+" ";
+			}
+			else{
+				markupedLine+="\t";
+			}
+			predicate = matcher.group(5);
+			object = matcher.group(8);
+		}		
+		else throw new RuntimeException("Unexpected triple pattern");
 		
 		markupedLine+=openSpan+" "+predicate+" "+object+" "+
 				CLOSING_SPAN+" "+currentLineEnding;
