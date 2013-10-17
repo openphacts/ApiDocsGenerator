@@ -8,6 +8,9 @@ public class ConfigExtractor extends TextExtractor {
 	private static final int ITEM_ENDPOINT = 0;
 	private static final int LIST_ENDPOINT = 1;
 	private static final int EXTERNAL_SERVICE_ENDPOINT = 2;
+	private static final int INTERMEDIATE_EXPANSION_ENDPOINT = 3;
+	private static final int BATCH_ENDPOINT = 4;
+	
 	
 	private static final String API_TEMPLATE_REGEX = "(.*?)api:template\\s*\\\"([^\\\"]*)\\\"";
 	
@@ -24,6 +27,15 @@ public class ConfigExtractor extends TextExtractor {
 		else if (text.indexOf("api:ExternalHTTPService")!=-1){
 			endpointType = EXTERNAL_SERVICE_ENDPOINT;
 		}
+		else if (text.indexOf("api:IntermediateExpansionEndpoint")!=-1){
+			endpointType = INTERMEDIATE_EXPANSION_ENDPOINT;
+		}
+		else if (text.indexOf("api:BatchEndpoint")!=-1){
+			endpointType = BATCH_ENDPOINT;
+		}
+		else{
+			throw new RuntimeException("Unrecognized endpoint type");
+		}
 		
 	}
 	
@@ -33,7 +45,7 @@ public class ConfigExtractor extends TextExtractor {
 	}
 	
 	public String getWhereClause(){
-		if (endpointType==ITEM_ENDPOINT||endpointType==EXTERNAL_SERVICE_ENDPOINT){
+		if (endpointType==ITEM_ENDPOINT||endpointType==EXTERNAL_SERVICE_ENDPOINT||endpointType==BATCH_ENDPOINT){
 			return extractFirstPattern(text, 
 				API_WHERE_REGEX, 2);
 		}
