@@ -19,7 +19,7 @@
     </target>
 
     <target name="run">
-        <java jar="build/jar/DocsGenerator.jar" fork="true"/>
+        <java classname="generator.Main" classpath="build/classes" />
     </target>
 
 </project>
